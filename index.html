@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>ScreenRecording</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+</head>
+<body>
+    <style>
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            font-size: 1em;
+        }
+    
+        video {
+            width: 30%;
+            border-radius: 5px;
+            border: 1px solid black;
+        }
+    </style>
+    
+    <title>Video+Screen recording using RecordRTC</title>
+    
+    <h1>
+        Video+Screen recording using RecordRTC
+    </h1>
+    
+    <p>It will record 10-seconds video and automatically stop the recording.</p>
+    <div id="container"></div>
+    <video controls autoplay playsinline style="width: 40%;"></video>
+    <button onclick="StartRec()">Start</button>
+    <button onclick="StopRec()">Stop</button>
+    <script src="RecordRTC.js"></script>
+    <script>
+        
+        if (!navigator.getDisplayMedia && !navigator.mediaDevices.getDisplayMedia) {
+            var error = 'Your browser does NOT supports getDisplayMedia API.';
+            document.querySelector('h1').innerHTML = error;
+    
+            document.querySelector('video').style.display = 'none';
+            document.getElementById('btn-start-recording').style.display = 'none';
+            document.getElementById('btn-stop-recording').style.display = 'none';
+            throw new Error(error);
+        }
+    
+        function invokeGetDisplayMedia(success, error) {
+            var displaymediastreamconstraints = {
+                video: {
+                    displaySurface: 'monitor', // monitor, window, application, browser
+                    logicalSurface: true,
+                    cursor: 'always' // never, always, motion
+                }
+            };
+            
+              
+            // above constraints are NOT supported YET
+            // that's why overridnig them
+            //displaymediastreamconstraints = {
+            //    video: true
+            //};
+            
+            if (navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia(displaymediastreamconstraints).then(success).catch(error);
+                
+             
+            }
+    
+            else {
+                navigator.getUserMedia(displaymediastreamconstraints).then(success).catch(error);
+            }
+            
+        }
+    
+        function captureScreen(callback) {
+            const { desktopCapturer } = require('electron')
+
+desktopCapturer.getSources({ types: ['window', 'screen'] }).then(async sources => {
+ 
+  for (const source of sources) {
+    
+    if (source.name ==="Entire Screen") {
+        
+      try {
+          
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: source.id,
+              minWidth: 1280,
+              maxWidth: 1280,
+              minHeight: 720,
+              maxHeight: 720
+            }
+          }
+        })
+        callback(stream)
+      } catch (e) {
+          alert(e);
+        
+      }
+      return
+    }
+  }
+})
+           
+        }
+    
+        function captureCamera(cb,error) {
+            navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(cb).catch(error);
+        }
+    
+        function keepStreamActive(stream) {
+            var video = document.createElement('video');
+            video.muted = true;
+            video.srcObject = stream;
+            video.style.display = 'none';
+            (document.body || document.documentElement).appendChild(video);
+        }
+        var recorder;
+        var screens;
+        var cameras;
+        function StartRec() {
+            captureScreen(function (screen) {
+                keepStreamActive(screen);
+                screens = screen;
+                captureCamera(function (camera) {
+                    keepStreamActive(camera);
+                    cameras = camera
+                    screen.width = window.screen.width;
+                    screen.height = window.screen.height;
+                    screen.fullcanvas = true;
+    
+                    camera.width = 400;
+                    camera.height = 350;
+                    camera.top = screen.height - camera.height;
+                    camera.left = screen.width - camera.width;
+    
+                    recorder = RecordRTC([screen, camera], {
+                        type: 'video',
+                        mimeType: 'video/webm',
+                        previewStream: function (s) {
+                            document.querySelector('video').muted = true;
+                            document.querySelector('video').srcObject = s;
+                        }
+                    });
+    
+                    recorder.startRecording();
+    
+                    window.stopCallback = function () {
+                        window.stopCallback = null;
+                    };
+    
+                    //   window.timeout = setTimeout(window.stopCallback, 10 * 1000);
+                }, function (error) {
+                    screen.getTracks().forEach(function (track) {
+                        track.stop();
+                    });
+    
+                    console.error(error);
+                    alert('Unable to capture your camera. \n' + error);
+                   
+                });
+    
+            });
+        }
+        function xhr(url, data, progress, percentage, callback) {
+                        var request = new XMLHttpRequest();
+                        request.onreadystatechange = function () {
+                            if (request.readyState == 4 && request.status == 200) {
+                                callback(request.responseText);
+                            }
+                        };
+    
+                      
+                        request.open('POST', url);
+                        request.send(data);
+                    }
+    
+        var fileName;
+        
+        function PostBlob(blob) {
+            var fs  = require('fs');
+            var reader = new FileReader()
+reader.onload = function(){
+    var buffer = new Buffer(reader.result)
+    fileName=(Math.round(Math.random() * 99999999) + 99999999) + '.webm';
+    fs.writeFile("Videos\\"+fileName, buffer, {}, (err, res) => {
+        if(err){
+            console.error(err)
+            return
+        }
+        console.log('video saved')
+    })
+}
+reader.readAsArrayBuffer(blob)
+            
+        }
+
+
+        function StopRec() {
+    
+                        recorder.stopRecording(function () {
+                            var blob = recorder.getBlob();
+                            document.querySelector('video').srcObject = null;
+                            document.querySelector('video').src = URL.createObjectURL(blob);
+                            document.querySelector('video').muted = false;
+    
+                            [screens, cameras].forEach(function (stream) {
+                                stream.getTracks().forEach(function (track) {
+                                    track.stop();
+                                });
+    
+                            });
+                            fileName=(Math.round(Math.random() * 99999999) + 99999999) + '.webm';
+                            console.log(recorder.getBlob());
+                            PostBlob( recorder.getBlob())
+                        });
+    
+        }
+        function addStreamStopListener(stream, callback) {
+            stream.addEventListener('ended', function () {
+                callback();
+                callback = function () { };
+            }, false);
+            stream.addEventListener('inactive', function () {
+                callback();
+                callback = function () { };
+            }, false);
+            stream.getTracks().forEach(function (track) {
+                track.addEventListener('ended', function () {
+                    callback();
+                    callback = function () { };
+                }, false);
+                track.addEventListener('inactive', function () {
+                    callback();
+                    callback = function () { };
+                }, false);
+            });
+        }
+    </script>
+    
+    <footer style="margin-top: 20px; text-align: left;"><small id="send-message"></small></footer>
+    <script src="https://www.webrtc-experiment.com/common.js"></script>
+</body>
+</html>

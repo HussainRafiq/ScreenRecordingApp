@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MediaCapture and Streams API</title>
+    <meta name="viewport" content="width=device-width">
+  
+</head>
+<body>
+    <header>
+        <h1>MediaCapture, MediaRecorder and Streams API</h1>
+    </header>
+    <main>
+        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Impedit molestiae itaque facere totam saepe tempore esse temporibus, quae reprehenderit aliquid iusto ea laborum, iure eligendi odio exercitationem sapiente illum quos.</p>
+        
+        <p><button id="btnStart">START RECORDING</button><br/>
+        <button id="btnStop">STOP RECORDING</button></p>
+        
+        <video controls></video>
+        
+        <video id="vid2" controls></video>
+        
+        <!-- could save to canvas and do image manipulation and saving too -->
+    </main>    
+    <script>
+       const { desktopCapturer } = require('electron')
+
+desktopCapturer.getSources({ types: ['window', 'screen'] }).then(async sources => {
+ 
+  for (const source of sources) {
+    
+    if (source.name ==="Entire Screen") {
+        
+      try {
+          
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: source.id,
+              minWidth: 1280,
+              maxWidth: 1280,
+              minHeight: 720,
+              maxHeight: 720
+            }
+          }
+        })
+        handleStream(stream)
+      } catch (e) {
+          alert(e);
+        handleError(e)
+      }
+      return
+    }
+  }
+})
+
+function handleStream (stream) {
+    console.log(stream);
+  const video = document.querySelector('video')
+  video.srcObject = stream
+  video.onloadedmetadata = (e) => video.play()
+}
+
+function handleError (e) {
+  console.log(e)
+}
+    </script>
+</body>
+</html>
